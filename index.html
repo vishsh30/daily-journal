@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dark Minimalist Journal</title>
+    <script src="https://unpkg.com/docx@8.2.2/build/index.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #121212; 
+            --card-bg: #1e1e1e; 
+            --text-main: #e0e0e0; 
+            --text-muted: #888;
+            --border: #333; 
+            --accent: #4a9eff;
+            --date-accent: #fccf03; 
+            --highlight: #252525;
+            --toolbar-btn: #aaa; 
+            --toolbar-hover: #ffffff;
+        }
+
+        body { 
+            font-family: 'Segoe UI', -apple-system, sans-serif; 
+            background: var(--bg-color); 
+            color: var(--text-main); 
+            display: flex; 
+            justify-content: center; 
+            padding: 20px; 
+            margin: 0;
+        }
+
+        .container { 
+            background: var(--card-bg); 
+            padding: 35px; 
+            border-radius: 16px; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5); 
+            width: 100%; 
+            max-width: 800px; 
+        }
+        
+        .header-row { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            margin-bottom: 30px; 
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 15px;
+        }
+
+        .header-date { 
+            font-size: 1.35rem; 
+            font-weight: 800;
+            color: var(--date-accent); 
+            text-align: right;
+            text-shadow: 0 0 10px rgba(252, 207, 3, 0.2);
+            letter-spacing: 0.5px;
+        }
+
+        .filename-section { 
+            background: var(--highlight); 
+            padding: 12px 20px; 
+            border-radius: 10px; 
+            margin-bottom: 30px;
+            display: flex; 
+            align-items: center; 
+            gap: 15px; 
+            border: 1px solid var(--border);
+        }
+
+        .filename-section label { 
+            font-weight: 600; 
+            font-size: 0.85rem; 
+            color: var(--text-muted); 
+            text-transform: uppercase; 
+            letter-spacing: 1px; 
+        }
+
+        .filename-section input { 
+            flex: 1; 
+            padding: 5px; 
+            border: none; 
+            background: transparent; 
+            font-size: 1rem; 
+            color: var(--text-main); 
+            outline: none;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        h3 { 
+            margin: 30px 0 12px 0; 
+            color: var(--text-main); 
+            font-size: 1rem; 
+            font-weight: 500; 
+            opacity: 0.9;
+        }
+
+        .toolbar { 
+            display: flex; 
+            gap: 15px; 
+            padding: 8px 0; 
+            margin-bottom: 5px; 
+            border-bottom: 1px solid var(--border); 
+        }
+
+        .toolbar button { 
+            background: none; 
+            border: none; 
+            padding: 5px; 
+            cursor: pointer; 
+            color: var(--toolbar-btn); 
+            transition: color 0.2s; 
+            font-size: 14px;
+        }
+
+        .toolbar button:hover { color: var(--toolbar-hover); }
+
+        .editor { 
+            width: 100%; 
+            min-height: 110px; 
+            padding: 10px 0; 
+            background: transparent; 
+            line-height: 1.7; 
+            font-size: 16px; 
+            box-sizing: border-box; 
+            outline: none; 
+            border: none; 
+            color: var(--text-main);
+        }
+        
+        .mood-box { 
+            padding: 20px; 
+            margin: 30px 0; 
+            text-align: center; 
+            border-top: 1px solid var(--border); 
+        }
+
+        .mood-options { 
+            display: flex; 
+            justify-content: center; 
+            gap: 30px; 
+            font-size: 1.8rem; 
+            margin-top: 15px; 
+        }
+
+        .mood-btn { 
+            cursor: pointer; 
+            opacity: 0.2; 
+            filter: grayscale(1); 
+            transition: all 0.3s ease; 
+        }
+
+        .mood-btn.selected { 
+            opacity: 1; 
+            filter: grayscale(0); 
+            transform: scale(1.25); 
+        }
+
+        .button-group { display: flex; gap: 15px; margin-top: 20px; }
+
+        .btn { 
+            flex: 1; 
+            padding: 16px; 
+            border: none; 
+            border-radius: 10px; 
+            cursor: pointer; 
+            font-weight: 600; 
+            transition: 0.3s; 
+        }
+
+        .btn-word { background: var(--accent); color: #000; } 
+
+        .btn-reset { 
+            background: transparent; 
+            color: var(--text-muted); 
+            border: 1px solid var(--border); 
+            flex: 0.2; 
+        }
+
+        .btn:hover { opacity: 0.8; transform: translateY(-1px); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-row">
+        <h2 style="margin:0; font-weight: 700; letter-spacing: -0.5px;">Daily Journal</h2>
+        <span id="currentDateDisplay" class="header-date"></span>
+    </div>
+
+    <div class="filename-section">
+        <label>File</label>
+        <input type="text" id="filename">
+    </div>
+
+    <h3>1. What are you grateful for today? What made you happy?</h3>
+    <div class="editor-container">
+        <div class="toolbar">
+            <button onclick="format('bold')"><b>B</b></button>
+            <button onclick="format('italic')"><i>I</i></button>
+            <button onclick="format('insertUnorderedList')">• List</button>
+        </div>
+        <div id="sec1" class="editor" contenteditable="true"></div>
+    </div>
+
+    <h3>2. What didn't make you feel great? Anything you want to improve on?</h3>
+    <div class="editor-container">
+        <div class="toolbar">
+            <button onclick="format('bold')"><b>B</b></button>
+            <button onclick="format('italic')"><i>I</i></button>
+            <button onclick="format('insertUnorderedList')">• List</button>
+        </div>
+        <div id="sec2" class="editor" contenteditable="true"></div>
+    </div>
+
+    <h3>3. Overall / Misc. thoughts</h3>
+    <div class="editor-container">
+        <div class="toolbar">
+            <button onclick="format('bold')"><b>B</b></button>
+            <button onclick="format('italic')"><i>I</i></button>
+            <button onclick="format('insertUnorderedList')">• List</button>
+        </div>
+        <div id="sec3" class="editor" contenteditable="true"></div>
+    </div>
+
+    <div class="mood-box">
+        <label style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted);">Today's Mood</label>
+        <div class="mood-options">
+            <span class="mood-btn" onclick="selectMood(this, 'Terrible')">😫</span>
+            <span class="mood-btn" onclick="selectMood(this, 'Bad')">🙁</span>
+            <span class="mood-btn" onclick="selectMood(this, 'Okay')">😐</span>
+            <span class="mood-btn" onclick="selectMood(this, 'Good')">🙂</span>
+            <span class="mood-btn" onclick="selectMood(this, 'Great')">🤩</span>
+        </div>
+        <input type="hidden" id="selectedMood" value="Not Specified">
+    </div>
+
+    <div class="button-group">
+        <button class="btn btn-reset" onclick="resetForm()">Clear</button>
+        <button class="btn btn-word" onclick="saveAsWord()">Export to Word (.docx)</button>
+    </div>
+</div>
+
+<script>
+    window.onload = () => {
+        const now = new Date();
+        const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        document.getElementById('currentDateDisplay').innerText = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+        document.getElementById('filename').value = `journal-${now.toISOString().split('T')[0]}`;
+    };
+
+    function format(command) { document.execCommand(command, false, null); }
+    
+    function selectMood(el, val) {
+        document.querySelectorAll('.mood-btn').forEach(btn => btn.classList.remove('selected'));
+        el.classList.add('selected');
+        document.getElementById('selectedMood').value = `${el.innerText} (${val})`;
+    }
+
+    function resetForm() {
+        if(confirm("Start fresh? This will clear all sections.")) {
+            document.querySelectorAll('.editor').forEach(e => e.innerHTML = "");
+            document.querySelectorAll('.mood-btn').forEach(btn => btn.classList.remove('selected'));
+            document.getElementById('selectedMood').value = "Not Specified";
+        }
+    }
+
+    async function saveAsWord() {
+        const h = [
+            "1. What are you grateful for today? What made you happy?",
+            "2. What didn't make you feel great? Anything you want to improve on?",
+            "3. Overall / Misc. thoughts"
+        ];
+
+        const docChildren = [
+            new docx.Paragraph({ children: [new docx.TextRun({ text: "Daily Journal Entry", bold: true, size: 40 })] }),
+            new docx.Paragraph({ children: [new docx.TextRun({ text: `Date: ${document.getElementById('currentDateDisplay').innerText}`, italic: true, size: 24 })], spacing: { after: 400 } })
+        ];
+
+        [1, 2, 3].forEach((num, i) => {
+            const content = document.getElementById(`sec${num}`).innerText;
+            docChildren.push(new docx.Paragraph({ children: [new docx.TextRun({ text: h[i], bold: true, size: 28, color: "2b579a" })], spacing: { before: 400, after: 200 } }));
+            
+            if (!content.trim()) {
+                docChildren.push(new docx.Paragraph({ children: [new docx.TextRun({ text: "(Empty)", italic: true, color: "999999" })] }));
+            } else {
+                content.split('\n').forEach(line => {
+                    docChildren.push(new docx.Paragraph({ children: [new docx.TextRun({ text: line || " ", size: 24 })], spacing: { after: 120 } }));
+                });
+            }
+        });
+
+        docChildren.push(new docx.Paragraph({ 
+            children: [new docx.TextRun({ text: `Final Mood: ${document.getElementById('selectedMood').value}`, bold: true, size: 32 })],
+            spacing: { before: 600 } 
+        }));
+
+        const doc = new docx.Document({ sections: [{ children: docChildren }] });
+        docx.Packer.toBlob(doc).then(blob => saveAs(blob, `${document.getElementById('filename').value}.docx`));
+    }
+</script>
+</body>
+</html>
