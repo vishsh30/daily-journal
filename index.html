@@ -18,16 +18,23 @@
             --highlight: #252525;
             --toolbar-btn: #aaa; 
             --toolbar-hover: #ffffff;
+            --success: #2ecc71;
         }
 
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg-color); color: var(--text-main); display: flex; justify-content: center; padding: 20px; margin: 0; }
         .container { background: var(--card-bg); padding: 35px; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); width: 100%; max-width: 800px; }
         .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid var(--border); padding-bottom: 15px; }
         .header-date { font-size: 1.35rem; font-weight: 800; color: var(--date-accent); text-align: right; }
+        
+        /* Added Save Status Indicator */
+        #saveStatus { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-right: 10px; }
+        
         .filename-section { background: var(--highlight); padding: 12px 20px; border-radius: 10px; margin-bottom: 30px; display: flex; align-items: center; gap: 15px; border: 1px solid var(--border); }
         .filename-section input { flex: 1; border: none; background: transparent; color: var(--text-main); outline: none; font-family: monospace; }
         h3 { margin: 30px 0 12px 0; font-size: 1rem; font-weight: 500; opacity: 0.9; }
-        .editor { width: 100%; min-height: 110px; line-height: 1.7; outline: none; color: var(--text-main); white-space: pre-wrap; }
+        .editor { width: 100%; min-height: 110px; line-height: 1.7; outline: none; color: var(--text-main); white-space: pre-wrap; border-bottom: 1px solid transparent; transition: 0.3s; }
+        .editor:focus { border-bottom: 1px solid var(--accent); }
+        
         .mood-box { padding: 20px; margin: 30px 0; text-align: center; border-top: 1px solid var(--border); }
         .mood-options { display: flex; justify-content: center; gap: 30px; font-size: 1.8rem; margin-top: 15px; }
         .mood-btn { cursor: pointer; opacity: 0.2; filter: grayscale(1); transition: 0.3s; }
@@ -41,23 +48,24 @@
         #fileInput { display: none; }
     </style>
 </head>
-<body>
+<body oninput="autoSave()">
 
 <div class="container">
     <div class="header-row">
         <h2 style="margin:0;">Daily Journal</h2>
-        <span id="currentDateDisplay" class="header-date"></span>
+        <div>
+            <span id="saveStatus"></span>
+            <span id="currentDateDisplay" class="header-date"></span>
+        </div>
     </div>
 
     <div class="filename-section">
         <label style="color:var(--text-muted); font-size:0.8rem;">FILE</label>
-        <input type="text" id="filename">
+        <input type="text" id="filename" placeholder="journal-name">
     </div>
 
     <h3>1. What are you grateful for today? What made you happy?</h3>
-    <div class="editor-container">
-        <div id="sec1" class="editor" contenteditable="true"></div>
-    </div>
+    <div id="sec1" class="editor" contenteditable="true"></div>
 
     <h3>2. What didn't make you feel great? Anything you want to improve on?</h3>
     <div id="sec2" class="editor" contenteditable="true"></div>
@@ -80,114 +88,146 @@
         <button class="btn btn-reset" onclick="resetForm()">Clear</button>
         <input type="file" id="fileInput" accept=".txt" onchange="handleFileUpload(event)">
         <button class="btn btn-import" onclick="document.getElementById('fileInput').click()">Import .txt</button>
-        <button class="btn btn-save" onclick="saveAsText()">Export to Text (.txt)</button>
+        <button class="btn btn-save" onclick="exportAsText()">Export As...</button>
     </div>
 </div>
 
 <script>
+    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
     window.onload = () => {
+        // Set Default Date
         const now = new Date();
-        const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
         document.getElementById('currentDateDisplay').innerText = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
-        document.getElementById('filename').value = `journal-${now.toISOString().split('T')[0]}`;
+        
+        // Check Local Storage
+        const savedData = localStorage.getItem('journal_autosave');
+        if (savedData) {
+            loadFromJSON(JSON.parse(savedData));
+        } else {
+            document.getElementById('filename').value = `journal-${now.toISOString().split('T')[0]}`;
+        }
     };
 
     function selectMood(el, val) {
         document.querySelectorAll('.mood-btn').forEach(btn => btn.classList.remove('selected'));
         el.classList.add('selected');
         document.getElementById('selectedMood').value = `${el.innerText} (${val})`;
+        autoSave();
     }
 
-    // New function to handle file upload
-    function handleFileUpload(event) {
-        const file = event.target.files[0];
-        if (!file) return;
+    // --- AUTOSAVE LOGIC ---
+    let saveTimeout;
+    function autoSave() {
+        const status = document.getElementById('saveStatus');
+        status.innerText = "Saving...";
+        status.style.color = "var(--date-accent)";
 
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const content = e.target.result;
-            parseJournalText(content, file.name);
-        };
-        reader.readAsText(file);
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => {
+            const data = {
+                filename: document.getElementById('filename').value,
+                sec1: document.getElementById('sec1').innerText,
+                sec2: document.getElementById('sec2').innerText,
+                sec3: document.getElementById('sec3').innerText,
+                mood: document.getElementById('selectedMood').value,
+                moodIndex: Array.from(document.querySelectorAll('.mood-btn')).findIndex(b => b.classList.contains('selected'))
+            };
+            localStorage.setItem('journal_autosave', JSON.stringify(data));
+            status.innerText = "Synced";
+            status.style.color = "var(--success)";
+        }, 800);
     }
 
-    // New function to parse the text and fill fields
-    function parseJournalText(text, fullFileName) {
-        try {
-            // Set filename (minus extension)
-            document.getElementById('filename').value = fullFileName.replace(/\.txt$/, '');
-
-            // Extract Date
-            const dateMatch = text.match(/Date: (.*)/);
-            if (dateMatch) document.getElementById('currentDateDisplay').innerText = dateMatch[1];
-
-            // Extract Mood and select emoji
-            const moodMatch = text.match(/Mood: (.*) \((.*)\)/);
-            if (moodMatch) {
-                const moodLabel = moodMatch[2]; // e.g., "Great"
-                const moodBtn = Array.from(document.querySelectorAll('.mood-btn')).find(b => b.getAttribute('data-mood') === moodLabel);
-                if (moodBtn) selectMood(moodBtn, moodLabel);
-            }
-
-            // Extract Sections
-            const sections = [
-                "1. What are you grateful for today?",
-                "2. What didn't make you feel great?",
-                "3. Overall / Misc. thoughts"
-            ];
-
-            sections.forEach((title, index) => {
-                const nextTitle = sections[index + 1] || null;
-                let startIdx = text.indexOf(title) + title.length;
-                let endIdx = nextTitle ? text.indexOf(nextTitle) : text.length;
-                
-                if (startIdx > title.length - 1) {
-                    let sectionContent = text.substring(startIdx, endIdx).trim();
-                    if (sectionContent === "(Empty)") sectionContent = "";
-                    document.getElementById(`sec${index + 1}`).innerText = sectionContent;
-                }
-            });
-
-            alert("File loaded successfully!");
-        } catch (err) {
-            console.error(err);
-            alert("Error parsing file. Make sure it's a journal file exported from this app.");
+    function loadFromJSON(data) {
+        document.getElementById('filename').value = data.filename || "";
+        document.getElementById('sec1').innerText = data.sec1 || "";
+        document.getElementById('sec2').innerText = data.sec2 || "";
+        document.getElementById('sec3').innerText = data.sec3 || "";
+        document.getElementById('selectedMood').value = data.mood || "Not Specified";
+        
+        if (data.moodIndex !== -1) {
+            const btns = document.querySelectorAll('.mood-btn');
+            if(btns[data.moodIndex]) btns[data.moodIndex].classList.add('selected');
         }
     }
 
-    function resetForm() {
-        if(confirm("Start fresh?")) {
-            document.querySelectorAll('.editor').forEach(e => e.innerText = "");
-            document.querySelectorAll('.mood-btn').forEach(btn => btn.classList.remove('selected'));
-            document.getElementById('selectedMood').value = "Not Specified";
-            document.getElementById('fileInput').value = ""; // Clear file input
-        }
-    }
-
-    function saveAsText() {
+    // --- FILE PICKER EXPORT ---
+    async function exportAsText() {
         const date = document.getElementById('currentDateDisplay').innerText;
         const mood = document.getElementById('selectedMood').value;
         const filename = document.getElementById('filename').value;
 
-        const h = [
-            "1. What are you grateful for today?",
-            "2. What didn't make you feel great?",
-            "3. Overall / Misc. thoughts"
-        ];
+        let textContent = `DAILY JOURNAL ENTRY\nDate: ${date}\nMood: ${mood}\n---------------------------\n\n`;
+        textContent += `1. What are you grateful for today?\n${document.getElementById('sec1').innerText.trim() || "(Empty)"}\n\n`;
+        textContent += `2. What didn't make you feel great?\n${document.getElementById('sec2').innerText.trim() || "(Empty)"}\n\n`;
+        textContent += `3. Overall / Misc. thoughts\n${document.getElementById('sec3').innerText.trim() || "(Empty)"}`;
 
-        let textContent = `DAILY JOURNAL ENTRY\n`;
-        textContent += `Date: ${date}\n`;
-        textContent += `Mood: ${mood}\n`;
-        textContent += `---------------------------\n\n`;
+        // Try System File Picker
+        if ('showSaveFilePicker' in window) {
+            try {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: `${filename}.txt`,
+                    types: [{ description: 'Text File', accept: { 'text/plain': ['.txt'] } }]
+                });
+                const writable = await handle.createWritable();
+                await writable.write(textContent);
+                await writable.close();
+                return;
+            } catch (err) {
+                console.log("Save cancelled");
+                return;
+            }
+        }
 
-        [1, 2, 3].forEach((num, i) => {
-            const content = document.getElementById(`sec${num}`).innerText;
-            textContent += `${h[i]}\n`;
-            textContent += `${content.trim() || "(Empty)"}\n\n`;
-        });
-
+        // Fallback to traditional download
         const blob = new Blob([textContent], { type: "text/plain;charset=utf-8" });
         saveAs(blob, `${filename}.txt`);
+    }
+
+    function handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => parseJournalText(e.target.result, file.name);
+        reader.readAsText(file);
+    }
+
+    function parseJournalText(text, fullFileName) {
+        try {
+            document.getElementById('filename').value = fullFileName.replace(/\.txt$/, '');
+            const dateMatch = text.match(/Date: (.*)/);
+            if (dateMatch) document.getElementById('currentDateDisplay').innerText = dateMatch[1];
+
+            const moodMatch = text.match(/Mood: (.*) \((.*)\)/);
+            if (moodMatch) {
+                const moodLabel = moodMatch[2];
+                const moodBtn = Array.from(document.querySelectorAll('.mood-btn')).find(b => b.getAttribute('data-mood') === moodLabel);
+                if (moodBtn) selectMood(moodBtn, moodLabel);
+            }
+
+            const sections = ["1. What are you grateful for today?", "2. What didn't make you feel great?", "3. Overall / Misc. thoughts"];
+            sections.forEach((title, index) => {
+                const nextTitle = sections[index + 1] || null;
+                let startIdx = text.indexOf(title) + title.length;
+                let endIdx = nextTitle ? text.indexOf(nextTitle) : text.length;
+                if (startIdx > title.length - 1) {
+                    let content = text.substring(startIdx, endIdx).trim();
+                    document.getElementById(`sec${index + 1}`).innerText = content === "(Empty)" ? "" : content;
+                }
+            });
+            autoSave(); // Save imported data to local storage
+        } catch (err) { alert("Error parsing file."); }
+    }
+
+    function resetForm() {
+        if(confirm("Start fresh? This will clear your saved progress.")) {
+            document.querySelectorAll('.editor').forEach(e => e.innerText = "");
+            document.querySelectorAll('.mood-btn').forEach(btn => btn.classList.remove('selected'));
+            document.getElementById('selectedMood').value = "Not Specified";
+            localStorage.removeItem('journal_autosave');
+            document.getElementById('saveStatus').innerText = "";
+        }
     }
 </script>
 </body>
